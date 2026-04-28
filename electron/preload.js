@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (channel, ...args) => {
     const validChannels = [
       'select-folder', 'clone-project', 'start-dev', 'stop-dev',
-      'build-export', 'list-components', 'read-json', 'write-json'
+      'build-export', 'list-components', 'read-json', 'write-json', 'list-json-files'
     ];
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args);

@@ -122,7 +122,7 @@ ipcMain.handle('read-json', async (event, workDir, targetFile) => {
     const targetPath = path.resolve(workDir, targetFile);
 
     // Security: Prevent directory traversal by ensuring the resolved path is inside workDir
-    if (!targetPath.startsWith(path.resolve(workDir))) {
+    if (!targetPath.startsWith(path.resolve(workDir) + path.sep)) {
       return { success: false, error: 'Invalid path' };
     }
 
@@ -143,7 +143,7 @@ ipcMain.handle('write-json', async (event, workDir, targetFile, jsonData) => {
     const targetPath = path.resolve(workDir, targetFile);
 
     // Security: Prevent directory traversal by ensuring the resolved path is inside workDir
-    if (!targetPath.startsWith(path.resolve(workDir))) {
+    if (!targetPath.startsWith(path.resolve(workDir) + path.sep)) {
       return { success: false, error: 'Invalid path' };
     }
 
@@ -249,7 +249,38 @@ ipcMain.handle('build-export', async (event, workDir) => {
   });
 });
 
-// 7. List Components in src/components
+// 7. List JSON Files
+ipcMain.handle('list-json-files', async (event, workDir) => {
+  try {
+    const jsonFiles = [];
+
+    // Recursive function to find JSON files
+    async function findJsonFiles(dir) {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        // Skip node_modules, .git, and dist
+        if (entry.isDirectory() && !['node_modules', '.git', 'dist'].includes(entry.name)) {
+          await findJsonFiles(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith('.json')) {
+          // Store relative path
+          jsonFiles.push(path.relative(workDir, fullPath).replace(/\\/g, '/'));
+        }
+      }
+    }
+
+    if (await fs.pathExists(workDir)) {
+      await findJsonFiles(workDir);
+    }
+
+    return { success: true, files: jsonFiles };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// 8. List Components in src/components
 ipcMain.handle('list-components', async (event, workDir) => {
   try {
     const componentsPath = path.join(workDir, 'src', 'components');
