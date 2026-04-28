@@ -256,21 +256,26 @@ ipcMain.handle('list-json-files', async (event, workDir) => {
 
     // Recursive function to find JSON files
     async function findJsonFiles(dir) {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
 
-        // Skip node_modules, .git, and dist
-        if (entry.isDirectory() && !['node_modules', '.git', 'dist'].includes(entry.name)) {
-          await findJsonFiles(fullPath);
-        } else if (entry.isFile() && entry.name.endsWith('.json')) {
-          // Store relative path
-          jsonFiles.push(path.relative(workDir, fullPath).replace(/\\/g, '/'));
+          // Skip node_modules, .git, dist, and hidden directories
+          if (entry.isDirectory() && !['node_modules', '.git', 'dist'].includes(entry.name) && !entry.name.startsWith('.')) {
+            await findJsonFiles(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith('.json')) {
+            // Store relative path
+            jsonFiles.push(path.relative(workDir, fullPath).replace(/\\/g, '/'));
+          }
         }
+      } catch (err) {
+        // Silently skip unreadable directories
+        console.warn(`Skipping unreadable directory: ${dir}`, err.message);
       }
     }
 
-    if (await fs.pathExists(workDir)) {
+    if (workDir && await fs.pathExists(workDir)) {
       await findJsonFiles(workDir);
     }
 

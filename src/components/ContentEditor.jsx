@@ -2,6 +2,36 @@ import { useState, useEffect } from 'react';
 import { Type, Save, Package, AlertCircle, Loader2, Plus, Trash2 } from 'lucide-react';
 import PropTypes from 'prop-types';
 
+// Sub-component to manage editing keys without losing focus
+function EditableKey({ initialKey, onRename }) {
+  const [editingKey, setEditingKey] = useState(initialKey);
+
+  useEffect(() => {
+    setEditingKey(initialKey);
+  }, [initialKey]);
+
+  return (
+    <input
+      type="text"
+      className="bg-transparent border-none text-[10px] text-gray-500 uppercase font-bold tracking-wider focus:outline-none focus:text-brand-gold w-full cursor-text hover:text-gray-400 transition-colors"
+      value={editingKey}
+      onChange={(e) => setEditingKey(e.target.value)}
+      onBlur={() => {
+        if (editingKey && editingKey !== initialKey) {
+          onRename(initialKey, editingKey);
+        } else {
+          setEditingKey(initialKey); // Revert if empty
+        }
+      }}
+    />
+  );
+}
+
+EditableKey.propTypes = {
+  initialKey: PropTypes.string.isRequired,
+  onRename: PropTypes.func.isRequired
+};
+
 export default function ContentEditor({ projectPath }) {
   const [jsonData, setJsonData] = useState(null);
   const [arraySchemas, setArraySchemas] = useState({});
@@ -89,6 +119,21 @@ export default function ContentEditor({ projectPath }) {
     }));
   };
 
+  const handleKeyRename = (oldKey, newKey) => {
+    setJsonData(prev => {
+      // Reconstruct object to maintain order
+      const newObj = {};
+      Object.keys(prev).forEach(k => {
+        if (k === oldKey) {
+          newObj[newKey] = prev[k];
+        } else {
+          newObj[k] = prev[k];
+        }
+      });
+      return newObj;
+    });
+  };
+
   const handleArrayFieldChange = (arrayKey, index, fieldKey, value) => {
     setJsonData(prev => {
       const updatedArray = [...prev[arrayKey]];
@@ -98,6 +143,48 @@ export default function ContentEditor({ projectPath }) {
         [arrayKey]: updatedArray
       };
     });
+  };
+
+  const handleArrayKeyRename = (arrayKey, index, oldKey, newKey) => {
+    setJsonData(prev => {
+      const updatedArray = [...prev[arrayKey]];
+      const item = updatedArray[index];
+
+      const newItem = {};
+      Object.keys(item).forEach(k => {
+        if (k === oldKey) {
+          newItem[newKey] = item[k];
+        } else {
+          newItem[k] = item[k];
+        }
+      });
+
+      updatedArray[index] = newItem;
+
+      return {
+        ...prev,
+        [arrayKey]: updatedArray
+      };
+    });
+
+    // Also update schema if renaming in first item, so future additions have the new key
+    if (index === 0) {
+      setArraySchemas(prevSchemas => {
+        const schema = prevSchemas[arrayKey];
+        if (schema && oldKey in schema) {
+          const newSchema = {};
+          Object.keys(schema).forEach(k => {
+            if (k === oldKey) {
+              newSchema[newKey] = schema[k];
+            } else {
+              newSchema[k] = schema[k];
+            }
+          });
+          return { ...prevSchemas, [arrayKey]: newSchema };
+        }
+        return prevSchemas;
+      });
+    }
   };
 
   const addArrayItem = (arrayKey) => {
@@ -194,7 +281,7 @@ export default function ContentEditor({ projectPath }) {
               if (typeof value !== 'object' || value === null) {
                 return (
                   <div key={key} className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{key}</label>
+                    <EditableKey initialKey={key} onRename={handleKeyRename} />
                     <input 
                       type="text"
                       className="bg-brand-dark border border-gray-800 text-white px-4 py-2.5 rounded-xl w-full text-sm focus:outline-none focus:border-brand-gold transition-colors"
@@ -240,7 +327,10 @@ export default function ContentEditor({ projectPath }) {
                       <div className="grid grid-cols-1 gap-4 pr-6">
                         {Object.entries(item).map(([fieldKey, fieldValue]) => (
                           <div key={fieldKey} className="space-y-1">
-                            <label className="text-[9px] text-gray-600 uppercase font-bold">{fieldKey}</label>
+                            <EditableKey
+                              initialKey={fieldKey}
+                              onRename={(oldK, newK) => handleArrayKeyRename(key, index, oldK, newK)}
+                            />
                             <input
                               className="bg-transparent text-white border-b border-gray-800 hover:border-gray-700 focus:border-brand-gold p-1 w-full text-sm transition-colors outline-none"
                               value={fieldValue || ''}
