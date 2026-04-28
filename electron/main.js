@@ -115,26 +115,40 @@ ipcMain.handle('clone-project', async (event, sourcePath) => {
   }
 });
 
-// 3. Read Content (Mocked reading a specific file or config, we'll assume a src/config.json or similar)
-ipcMain.handle('read-config', async (event, workDir) => {
+// 3. Read JSON (Dynamic File Reading with Directory Traversal Protection)
+ipcMain.handle('read-json', async (event, workDir, targetFile) => {
   try {
-    const configPath = path.join(workDir, 'src', 'data', 'config.json');
-    if (await fs.pathExists(configPath)) {
-      const data = await fs.readJson(configPath);
+    if (!targetFile) throw new Error("targetFile is required");
+    const targetPath = path.resolve(workDir, targetFile);
+
+    // Security: Prevent directory traversal by ensuring the resolved path is inside workDir
+    if (!targetPath.startsWith(path.resolve(workDir))) {
+      return { success: false, error: 'Invalid path' };
+    }
+
+    if (await fs.pathExists(targetPath)) {
+      const data = await fs.readJson(targetPath);
       return { success: true, data };
     }
-    return { success: false, error: 'Config file not found' };
+    return { success: false, error: 'File not found' };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
 
-// 4. Save Content
-ipcMain.handle('save-config', async (event, workDir, configData) => {
+// 4. Write JSON (Dynamic File Writing with Directory Traversal Protection)
+ipcMain.handle('write-json', async (event, workDir, targetFile, jsonData) => {
   try {
-    const configPath = path.join(workDir, 'src', 'data', 'config.json');
-    await fs.ensureDir(path.dirname(configPath));
-    await fs.writeJson(configPath, configData, { spaces: 2 });
+    if (!targetFile) throw new Error("targetFile is required");
+    const targetPath = path.resolve(workDir, targetFile);
+
+    // Security: Prevent directory traversal by ensuring the resolved path is inside workDir
+    if (!targetPath.startsWith(path.resolve(workDir))) {
+      return { success: false, error: 'Invalid path' };
+    }
+
+    await fs.ensureDir(path.dirname(targetPath));
+    await fs.writeJson(targetPath, jsonData, { spaces: 2 });
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
