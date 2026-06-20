@@ -19,7 +19,7 @@ const DesignEditor = ({ projectPath }) => {
     const loadConfig = async () => {
       if (!projectPath || !selectedComponent) return;
       try {
-        const res = await window.electronAPI.readConfig(projectPath);
+        const res = await window.electronAPI.invoke('read-json', projectPath, 'src/data/config.json');
         // If config exists for this component, load it, otherwise reset to defaults
         if (res.success && res.data && res.data[selectedComponent]) {
           setConfig({ ...config, ...res.data[selectedComponent] });
